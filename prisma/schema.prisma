@@ -1,0 +1,133 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum QuestStatus {
+  LATENT
+  ACTIVE
+  TURNING
+  CONCLUDED
+  ABANDONED
+}
+
+enum CardMoment {
+  Beginning
+  Tension
+  Confrontation
+  Turn
+  Loss
+  Resolution
+  Surrender
+  Revelation
+}
+
+enum CardAgency {
+  Acted
+  Received
+  Observed
+}
+
+enum CardDimension {
+  Inner
+  Interpersonal
+  Transcendent
+}
+
+model User {
+  id          String    @id @default(uuid())
+  firebaseUid String    @unique
+  email       String    @unique
+  name        String
+  avatarUrl   String?
+  xp          Int       @default(0)
+  level       Int       @default(1)
+  levelName   String    @default("O Aprendiz")
+  streakDays  Int       @default(0)
+  lastEntryAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  entries   Entry[]
+  userCards UserCard[]
+  quests    Quest[]
+
+  @@map("users")
+}
+
+model DeckCard {
+  id          String        @id @default(uuid())
+  title       String        @unique
+  imageId     String
+  imageUrl    String
+  description String?
+  order       Int           @unique
+  moment      CardMoment
+  agency      CardAgency
+  dimension   CardDimension
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  userCards UserCard[]
+
+  @@unique([moment, agency, dimension])
+  @@map("deck_cards")
+}
+
+model UserCard {
+  id         String    @id @default(uuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deckCardId String
+  deckCard   DeckCard  @relation(fields: [deckCardId], references: [id])
+  entryId    String?   @unique
+  entry      Entry?    @relation(fields: [entryId], references: [id])
+  insight    String
+  fragment   String
+  xpEarned   Int       @default(0)
+  questId    String?
+  quest      Quest?    @relation(fields: [questId], references: [id])
+  unlockedAt DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@unique([userId, deckCardId])
+  @@map("user_cards")
+}
+
+model Entry {
+  id            String    @id @default(uuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transcription String
+  audioUrl      String?
+  durationSecs  Int?
+  xpEarned      Int       @default(0)
+  unlockedCard  Boolean   @default(false)
+  userCard      UserCard?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@map("entries")
+}
+
+model Quest {
+  id          String      @id @default(uuid())
+  userId      String
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  status      QuestStatus @default(LATENT)
+  detectedAt  DateTime    @default(now())
+  activatedAt DateTime?
+  concludedAt DateTime?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  userCards UserCard[]
+
+  @@map("quests")
+}
