@@ -1,0 +1,18 @@
+meta {
+  name: Create entry
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{api_base_url}}/entries
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "transcription": "Bruno smoke test entry — enough text for card gates.",
+    "durationSecs": 120
+  }
+}

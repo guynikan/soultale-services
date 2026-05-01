@@ -1,0 +1,10 @@
+vars {
+  api_base_url: http://127.0.0.1:3000
+  firebase_web_api_key: AIzaSyCjdnGYLCW6xKrgTMoUrEGSQ9Rb1pUQCSk
+  firebase_test_email: seu-email@exemplo.com
+  firebase_test_password: sua-senha
+  deck_card_id:
+  entry_id:
+  quest_id:
+  user_card_id:
+}

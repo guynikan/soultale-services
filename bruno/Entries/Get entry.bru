@@ -1,0 +1,11 @@
+meta {
+  name: Get entry
+  type: http
+  seq: 10
+}
+
+get {
+  url: {{api_base_url}}/entries/{{entry_id}}
+  body: none
+  auth: none
+}

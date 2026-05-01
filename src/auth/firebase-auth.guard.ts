@@ -19,7 +19,11 @@ export class FirebaseAuthGuard implements CanActivate {
 
     if (isPublic) return true;
 
-    const request = context.switchToHttp().getRequest<{ headers: Record<string, string | undefined>; user?: unknown }>();
+    const request = context.switchToHttp().getRequest<{ headers: Record<string, string | undefined>; user?: unknown; url?: string }>();
+    const url = request.url ?? '';
+    if (url.startsWith('/docs') || url.startsWith('/docs-json')) {
+      return true;
+    }
     const authHeader = request.headers.authorization;
 
     if (!authHeader?.startsWith('Bearer ')) {

@@ -1,0 +1,11 @@
+meta {
+  name: Delete entry
+  type: http
+  seq: 11
+}
+
+delete {
+  url: {{api_base_url}}/entries/{{entry_id}}
+  body: none
+  auth: none
+}

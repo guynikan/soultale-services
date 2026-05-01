@@ -1,0 +1,17 @@
+meta {
+  name: Patch quest
+  type: http
+  seq: 14
+}
+
+patch {
+  url: {{api_base_url}}/quests/{{quest_id}}
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "status": "ACTIVE"
+  }
+}

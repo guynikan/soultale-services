@@ -1,8 +1,21 @@
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 import { Provider } from '@nestjs/common';
 import { cert, getApps, initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 
 export const FIREBASE_AUTH = 'FIREBASE_AUTH';
+
+function loadServiceAccountJson(): string | null {
+  const inline = process.env.FIREBASE_SERVICE_ACCOUNT_JSON?.trim();
+  if (inline) return inline;
+
+  const filePath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH?.trim();
+  if (!filePath) return null;
+
+  const absolute = resolve(process.cwd(), filePath);
+  return readFileSync(absolute, 'utf8');
+}
 
 export const FirebaseAdminProvider: Provider = {
   provide: FIREBASE_AUTH,
@@ -15,10 +28,21 @@ export const FirebaseAdminProvider: Provider = {
       };
     }
 
-    const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+    let serviceAccountJson: string | null = null;
+    try {
+      serviceAccountJson = loadServiceAccountJson();
+    } catch {
+      serviceAccountJson = null;
+    }
 
     if (!serviceAccountJson) {
-      throw new Error('FIREBASE_SERVICE_ACCOUNT_JSON is required');
+      return {
+        verifyIdToken: async () => {
+          throw new Error(
+            'Firebase Admin: set FIREBASE_SERVICE_ACCOUNT_JSON or FIREBASE_SERVICE_ACCOUNT_PATH',
+          );
+        },
+      };
     }
 
     const parsed = JSON.parse(serviceAccountJson) as {

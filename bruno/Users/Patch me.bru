@@ -1,0 +1,17 @@
+meta {
+  name: Patch me
+  type: http
+  seq: 3
+}
+
+patch {
+  url: {{api_base_url}}/users/me
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "name": "SoulTale Tester"
+  }
+}

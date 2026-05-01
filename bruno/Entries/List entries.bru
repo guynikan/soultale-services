@@ -1,0 +1,11 @@
+meta {
+  name: List entries
+  type: http
+  seq: 9
+}
+
+get {
+  url: {{api_base_url}}/entries?page=1&limit=20
+  body: none
+  auth: none
+}
