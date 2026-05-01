@@ -38,7 +38,7 @@ export class DeckService {
         title: item.title,
         order: item.order,
         unlocked: Boolean(userCard),
-        imageUrl: userCard ? item.imageUrl : null,
+        imageUrl: item.imageUrl,
         userCard: userCard
           ? {
               id: userCard.id,
@@ -65,7 +65,7 @@ export class DeckService {
       title: item.title,
       order: item.order,
       unlocked: Boolean(userCard),
-      imageUrl: userCard ? item.imageUrl : null,
+      imageUrl: item.imageUrl,
       userCard: userCard
         ? {
             id: userCard.id,

@@ -32,3 +32,11 @@ Collection versionada em `bruno/`. Abra essa pasta no [Bruno](https://www.usebru
 5. Doc OpenAPI: com a API no ar, no Bruno use **Import → OpenAPI** em `http://127.0.0.1:3000/docs-json` se quiser gerar/atualizar requests a partir do Swagger (a pasta `bruno/` continua sendo a collection “oficial” com auth automático).
 
 Se `require("axios")` falhar no script, ative **Developer Mode** nas preferências do Bruno (scripts com `axios`/`await` dependem disso nas versões recentes).
+
+## Imagens do baralho (R2 ou outro CDN)
+
+- Defina `DECK_ASSETS_PUBLIC_BASE_URL` no `.env` (origem **sem** barra final), por exemplo o host `https://pub-….r2.dev` ou um domínio próprio apontando ao bucket.
+- Faça upload dos arquivos em **`deck/v1/{imageId}.png`**, com os mesmos `imageId` do seed (`margem`, `porta-fechada`, `armadura`, `impasse`, `guinada`, `correnteza`).
+- Rode `npm run db:seed` de novo para atualizar `DeckCard.imageUrl` no banco. Sem essa variável, o seed continua usando as URLs de fallback no GitHub.
+
+**Segurança:** tokens de API da Cloudflare (`cfat_…`) e chaves S3 do R2 **não** vão para o app nem para o Git — só em `.env` local/CI secreto. Se um token vazou, revogue no painel e crie outro.

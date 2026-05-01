@@ -2,22 +2,33 @@ import { CardAgency, CardDimension, CardMoment, PrismaClient, QuestStatus } from
 
 const prisma = new PrismaClient();
 
-const DECK_MVP: Array<{ order: number; title: string; imageId: string; imageUrl: string; moment: CardMoment; agency: CardAgency; dimension: CardDimension }> = [
-  { order: 1, title: 'A Margem', imageId: 'margem', imageUrl: 'https://raw.githubusercontent.com/ed/soultale/main/assets/cards/margem.png', moment: 'Loss', agency: 'Observed', dimension: 'Interpersonal' },
-  { order: 2, title: 'A Porta Fechada', imageId: 'porta-fechada', imageUrl: 'https://raw.githubusercontent.com/ed/soultale/main/assets/cards/porta-fechada.png', moment: 'Loss', agency: 'Acted', dimension: 'Interpersonal' },
-  { order: 3, title: 'A Armadura', imageId: 'armadura', imageUrl: 'https://raw.githubusercontent.com/ed/soultale/main/assets/cards/armadura.png', moment: 'Loss', agency: 'Acted', dimension: 'Inner' },
-  { order: 4, title: 'O Impasse', imageId: 'impasse', imageUrl: 'https://raw.githubusercontent.com/ed/soultale/main/assets/cards/impasse.png', moment: 'Tension', agency: 'Acted', dimension: 'Interpersonal' },
-  { order: 5, title: 'O Alvo', imageId: 'impasse', imageUrl: 'https://raw.githubusercontent.com/ed/soultale/main/assets/cards/impasse.png', moment: 'Tension', agency: 'Received', dimension: 'Interpersonal' },
-  { order: 6, title: 'O Primeiro Passo', imageId: 'guinada', imageUrl: 'https://raw.githubusercontent.com/ed/soultale/main/assets/cards/guinada.png', moment: 'Beginning', agency: 'Acted', dimension: 'Interpersonal' },
-  { order: 7, title: 'A Acusação', imageId: 'porta-fechada', imageUrl: 'https://raw.githubusercontent.com/ed/soultale/main/assets/cards/porta-fechada.png', moment: 'Confrontation', agency: 'Received', dimension: 'Interpersonal' },
-  { order: 8, title: 'O Último Encontro', imageId: 'margem', imageUrl: 'https://raw.githubusercontent.com/ed/soultale/main/assets/cards/margem.png', moment: 'Resolution', agency: 'Acted', dimension: 'Interpersonal' },
-  { order: 9, title: 'A Guinada', imageId: 'guinada', imageUrl: 'https://raw.githubusercontent.com/ed/soultale/main/assets/cards/guinada.png', moment: 'Turn', agency: 'Acted', dimension: 'Inner' },
-  { order: 10, title: 'A Correnteza', imageId: 'correnteza', imageUrl: 'https://raw.githubusercontent.com/ed/soultale/main/assets/cards/correnteza.png', moment: 'Surrender', agency: 'Received', dimension: 'Transcendent' },
+const FALLBACK_CARD_IMAGE_BASE = 'https://raw.githubusercontent.com/ed/soultale/main/assets/cards';
+
+function deckImageUrl(imageId: string): string {
+  const base = (process.env.DECK_ASSETS_PUBLIC_BASE_URL ?? '').trim().replace(/\/$/, '');
+  if (base) {
+    return `${base}/deck/v1/${imageId}.png`;
+  }
+  return `${FALLBACK_CARD_IMAGE_BASE}/${imageId}.png`;
+}
+
+const DECK_MVP: Array<{ order: number; title: string; imageId: string; moment: CardMoment; agency: CardAgency; dimension: CardDimension }> = [
+  { order: 1, title: 'A Margem', imageId: 'margem', moment: 'Loss', agency: 'Observed', dimension: 'Interpersonal' },
+  { order: 2, title: 'A Porta Fechada', imageId: 'porta-fechada', moment: 'Loss', agency: 'Acted', dimension: 'Interpersonal' },
+  { order: 3, title: 'A Armadura', imageId: 'armadura', moment: 'Loss', agency: 'Acted', dimension: 'Inner' },
+  { order: 4, title: 'O Impasse', imageId: 'impasse', moment: 'Tension', agency: 'Acted', dimension: 'Interpersonal' },
+  { order: 5, title: 'O Alvo', imageId: 'impasse', moment: 'Tension', agency: 'Received', dimension: 'Interpersonal' },
+  { order: 6, title: 'O Primeiro Passo', imageId: 'guinada', moment: 'Beginning', agency: 'Acted', dimension: 'Interpersonal' },
+  { order: 7, title: 'A Acusação', imageId: 'porta-fechada', moment: 'Confrontation', agency: 'Received', dimension: 'Interpersonal' },
+  { order: 8, title: 'O Último Encontro', imageId: 'margem', moment: 'Resolution', agency: 'Acted', dimension: 'Interpersonal' },
+  { order: 9, title: 'A Guinada', imageId: 'guinada', moment: 'Turn', agency: 'Acted', dimension: 'Inner' },
+  { order: 10, title: 'A Correnteza', imageId: 'correnteza', moment: 'Surrender', agency: 'Received', dimension: 'Transcendent' },
 ];
 
 async function seedDeck(): Promise<void> {
   for (const card of DECK_MVP) {
-    await prisma.deckCard.upsert({ where: { title: card.title }, update: card, create: card });
+    const row = { ...card, imageUrl: deckImageUrl(card.imageId) };
+    await prisma.deckCard.upsert({ where: { title: card.title }, update: row, create: row });
   }
 }
 
