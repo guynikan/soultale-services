@@ -4,8 +4,18 @@ import { CARD_GATES, XP_VALUES } from '../config/constants';
 import { DeckService } from '../deck/deck.service';
 import { UserCardsService } from './user-cards.service';
 
+// Card unlock gate pipeline — order is intentional (cheap checks before the AI call):
+//
+//  1. too_short      — entry below minimum chars / duration threshold (free, sync)
+//  2. cooldown       — last unlock was within COOLDOWN_HOURS (1 DB read)
+//  3. daily_cap      — user already reached DAILY_CAP unlocks today (1 DB read)
+//  ── AI call ──────────────────────────────────────────────────────────────────
+//  4. ai_rejected    — AI decided the entry has no emotional weight (Anthropic API)
+//  5. unmapped_combo — AI combo (moment×agency×dimension) has no deck card (1 DB read)
+//  6. duplicate      — user already owns the matched deck card (1 DB read)
+
 export type CardDecision =
-  | { unlocked: false; reason: 'too_short' | 'ai_rejected' | 'unmapped_combo' | 'duplicate' | 'cooldown' | 'daily_cap' }
+  | { unlocked: false; reason: 'too_short' | 'cooldown' | 'daily_cap' | 'ai_rejected' | 'unmapped_combo' | 'duplicate' }
   | { unlocked: true; deckCardId: string; deckCardTitle: string; insight: string; fragment: string };
 
 @Injectable()
@@ -59,31 +69,18 @@ export class CardUnlockPolicy {
       entryKind === 'text' ||
       (entryKind !== 'voice' && (durationSecs === undefined || durationSecs === null));
 
+    // Gate 1: too_short
     const minChars = written ? CARD_GATES.MIN_TRANSCRIPTION_CHARS_TEXT : CARD_GATES.MIN_TRANSCRIPTION_CHARS_VOICE;
     if (transcription.trim().length < minChars) {
       return this.blocked(input, 'too_short', { minChars, written });
     }
-
     const hasVoiceTiming =
       typeof durationSecs === 'number' && Number.isFinite(durationSecs) && durationSecs >= 0;
     if (!written && hasVoiceTiming && durationSecs < CARD_GATES.MIN_DURATION_SECS) {
       return this.blocked(input, 'too_short', { minDurationSecs: CARD_GATES.MIN_DURATION_SECS, written });
     }
 
-    const ai = await this.aiService.analyzeEntry(transcription, { written });
-    if (!ai.shouldGenerateCard) {
-      return this.blocked(input, 'ai_rejected');
-    }
-
-    const deckCard = await this.deckService.findByCombo(ai.moment, ai.agency, ai.dimension);
-    if (!deckCard) {
-      return this.blocked(input, 'unmapped_combo', { moment: ai.moment, agency: ai.agency, dimension: ai.dimension });
-    }
-
-    if (await this.userCardsService.hasUnlocked(userId, deckCard.id)) {
-      return this.blocked(input, 'duplicate', { deckCardId: deckCard.id, deckCardTitle: deckCard.title });
-    }
-
+    // Gate 2: cooldown
     const latestUnlock = await this.userCardsService.latestUnlock(userId);
     if (latestUnlock) {
       const diffHours = (Date.now() - latestUnlock.unlockedAt.getTime()) / (1000 * 60 * 60);
@@ -95,10 +92,28 @@ export class CardUnlockPolicy {
       }
     }
 
+    // Gate 3: daily_cap
     const { start, tomorrow } = this.todayRange();
     const todayCount = await this.userCardsService.countToday(userId, start, tomorrow);
     if (todayCount >= CARD_GATES.DAILY_CAP) {
       return this.blocked(input, 'daily_cap', { dailyCap: CARD_GATES.DAILY_CAP, todayCount });
+    }
+
+    // Gate 4: ai_rejected
+    const ai = await this.aiService.analyzeEntry(transcription, { written });
+    if (!ai.shouldGenerateCard) {
+      return this.blocked(input, 'ai_rejected');
+    }
+
+    // Gate 5: unmapped_combo
+    const deckCard = await this.deckService.findByCombo(ai.moment, ai.agency, ai.dimension);
+    if (!deckCard) {
+      return this.blocked(input, 'unmapped_combo', { moment: ai.moment, agency: ai.agency, dimension: ai.dimension });
+    }
+
+    // Gate 6: duplicate
+    if (await this.userCardsService.hasUnlocked(userId, deckCard.id)) {
+      return this.blocked(input, 'duplicate', { deckCardId: deckCard.id, deckCardTitle: deckCard.title });
     }
 
     this.logger.log(JSON.stringify({
