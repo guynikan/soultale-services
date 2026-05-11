@@ -114,6 +114,8 @@ export class CardUnlockPolicy {
       dimension: ai.dimension,
       deckCardId: deckCard.id,
       deckCardTitle: deckCard.title,
+      insight: ai.insight,
+      fragment: ai.fragment,
     }));
 
     return {

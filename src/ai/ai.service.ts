@@ -106,10 +106,14 @@ fragment must be a contiguous literal substring copied from the input (same spel
         model: this.model,
         written,
         transcriptionChars: transcription.trim().length,
-        shouldGenerateCard: result.shouldGenerateCard,
-        ...(result.shouldGenerateCard
-          ? { moment: result.moment, agency: result.agency, dimension: result.dimension }
-          : {}),
+        aiDecision: result.shouldGenerateCard ? 'card' : 'skip',
+        ...(result.shouldGenerateCard ? {
+          moment: result.moment,
+          agency: result.agency,
+          dimension: result.dimension,
+          insight: result.insight,
+          fragment: result.fragment,
+        } : {}),
       }));
       return result;
     } catch (error) {
@@ -118,9 +122,9 @@ fragment must be a contiguous literal substring copied from the input (same spel
         model: this.model,
         written,
         transcriptionChars: transcription.trim().length,
-        shouldGenerateCard: false,
-        error: String(error),
-        rawResponse: textBlock.text.slice(0, 300),
+        aiDecision: 'parse_error',
+        parseError: String(error),
+        rawResponse: textBlock.text.slice(0, 500),
       }));
       return { shouldGenerateCard: false };
     }
