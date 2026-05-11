@@ -6,7 +6,7 @@ import { UserCardsService } from './user-cards.service';
 
 export type CardDecision =
   | { unlocked: false; reason: 'too_short' | 'ai_rejected' | 'unmapped_combo' | 'duplicate' | 'cooldown' | 'daily_cap' }
-  | { unlocked: true; deckCardId: string; insight: string; fragment: string };
+  | { unlocked: true; deckCardId: string; deckCardTitle: string; insight: string; fragment: string };
 
 @Injectable()
 export class CardUnlockPolicy {
@@ -27,32 +27,102 @@ export class CardUnlockPolicy {
     return { start, tomorrow };
   }
 
-  async evaluate(input: { userId: string; entryId: string; transcription: string; durationSecs?: number }): Promise<CardDecision> {
-    const { userId, transcription, durationSecs } = input;
+  private blocked(
+    input: { userId: string; entryId: string; transcription: string; durationSecs?: number; entryKind?: string },
+    reason: Extract<CardDecision, { unlocked: false }>['reason'],
+    extra?: Record<string, unknown>,
+  ): Extract<CardDecision, { unlocked: false }> {
+    this.logger.log(JSON.stringify({
+      event: 'entry.card_decision',
+      outcome: 'blocked',
+      reason,
+      userId: input.userId,
+      entryId: input.entryId,
+      entryKind: input.entryKind ?? 'unknown',
+      transcriptionChars: input.transcription.trim().length,
+      durationSecs: input.durationSecs ?? null,
+      ...extra,
+    }));
+    return { unlocked: false, reason };
+  }
 
-    if (transcription.trim().length < CARD_GATES.MIN_TRANSCRIPTION_CHARS) return { unlocked: false, reason: 'too_short' };
-    if (typeof durationSecs === 'number' && durationSecs < CARD_GATES.MIN_DURATION_SECS) return { unlocked: false, reason: 'too_short' };
+  async evaluate(input: {
+    userId: string;
+    entryId: string;
+    transcription: string;
+    durationSecs?: number;
+    entryKind?: 'voice' | 'text';
+  }): Promise<CardDecision> {
+    const { userId, transcription, durationSecs, entryKind } = input;
 
-    const ai = await this.aiService.analyzeEntry(transcription);
-    if (!ai.shouldGenerateCard) return { unlocked: false, reason: 'ai_rejected' };
+    const written =
+      entryKind === 'text' ||
+      (entryKind !== 'voice' && (durationSecs === undefined || durationSecs === null));
+
+    const minChars = written ? CARD_GATES.MIN_TRANSCRIPTION_CHARS_TEXT : CARD_GATES.MIN_TRANSCRIPTION_CHARS_VOICE;
+    if (transcription.trim().length < minChars) {
+      return this.blocked(input, 'too_short', { minChars, written });
+    }
+
+    const hasVoiceTiming =
+      typeof durationSecs === 'number' && Number.isFinite(durationSecs) && durationSecs >= 0;
+    if (!written && hasVoiceTiming && durationSecs < CARD_GATES.MIN_DURATION_SECS) {
+      return this.blocked(input, 'too_short', { minDurationSecs: CARD_GATES.MIN_DURATION_SECS, written });
+    }
+
+    const ai = await this.aiService.analyzeEntry(transcription, { written });
+    if (!ai.shouldGenerateCard) {
+      return this.blocked(input, 'ai_rejected');
+    }
 
     const deckCard = await this.deckService.findByCombo(ai.moment, ai.agency, ai.dimension);
-    if (!deckCard) return { unlocked: false, reason: 'unmapped_combo' };
-    if (await this.userCardsService.hasUnlocked(userId, deckCard.id)) return { unlocked: false, reason: 'duplicate' };
+    if (!deckCard) {
+      return this.blocked(input, 'unmapped_combo', { moment: ai.moment, agency: ai.agency, dimension: ai.dimension });
+    }
+
+    if (await this.userCardsService.hasUnlocked(userId, deckCard.id)) {
+      return this.blocked(input, 'duplicate', { deckCardId: deckCard.id, deckCardTitle: deckCard.title });
+    }
 
     const latestUnlock = await this.userCardsService.latestUnlock(userId);
     if (latestUnlock) {
       const diffHours = (Date.now() - latestUnlock.unlockedAt.getTime()) / (1000 * 60 * 60);
-      if (diffHours < CARD_GATES.COOLDOWN_HOURS) return { unlocked: false, reason: 'cooldown' };
+      if (diffHours < CARD_GATES.COOLDOWN_HOURS) {
+        return this.blocked(input, 'cooldown', {
+          cooldownHours: CARD_GATES.COOLDOWN_HOURS,
+          hoursRemaining: Math.ceil(CARD_GATES.COOLDOWN_HOURS - diffHours),
+        });
+      }
     }
 
     const { start, tomorrow } = this.todayRange();
     const todayCount = await this.userCardsService.countToday(userId, start, tomorrow);
-    if (todayCount >= CARD_GATES.DAILY_CAP) return { unlocked: false, reason: 'daily_cap' };
+    if (todayCount >= CARD_GATES.DAILY_CAP) {
+      return this.blocked(input, 'daily_cap', { dailyCap: CARD_GATES.DAILY_CAP, todayCount });
+    }
 
-    this.logger.log(JSON.stringify({ event: 'entry.card_decision', userId, entryId: input.entryId, outcome: 'unlocked', reason: 'success', moment: ai.moment, agency: ai.agency, dimension: ai.dimension, deckCardTitle: deckCard.title }));
+    this.logger.log(JSON.stringify({
+      event: 'entry.card_decision',
+      outcome: 'unlocked',
+      userId,
+      entryId: input.entryId,
+      entryKind: entryKind ?? 'unknown',
+      transcriptionChars: transcription.trim().length,
+      durationSecs: durationSecs ?? null,
+      moment: ai.moment,
+      agency: ai.agency,
+      dimension: ai.dimension,
+      deckCardId: deckCard.id,
+      deckCardTitle: deckCard.title,
+    }));
 
-    return { unlocked: true, deckCardId: deckCard.id, insight: ai.insight, fragment: ai.fragment };
+    return {
+      unlocked: true,
+      deckCardId: deckCard.id,
+      deckCardTitle: deckCard.title,
+      insight: ai.insight,
+      fragment: ai.fragment,
+    };
   }
 
   cardXp(): number {

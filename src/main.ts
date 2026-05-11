@@ -5,11 +5,14 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+import { createPinoLogger, NrLoggerService } from './common/logger/nr-logger.service';
 
 async function bootstrap(): Promise<void> {
+  const pinoLogger = createPinoLogger();
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
-    new FastifyAdapter({ logger: true }),
+    new FastifyAdapter({ loggerInstance: pinoLogger }),
+    { logger: new NrLoggerService(pinoLogger) },
   );
 
   app.use(helmet());

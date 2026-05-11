@@ -65,23 +65,34 @@ export class AiService {
     };
   }
 
-  async analyzeEntry(transcription: string): Promise<AiResult> {
-    const system = `You are a narrative classifier. Analyze voice diary transcription and decide if it deserves a collectible card.
-Cards are only for emotionally significant moments.
+  async analyzeEntry(transcription: string, opts?: { written?: boolean }): Promise<AiResult> {
+    const written = opts?.written ?? false;
+    const modality = written
+      ? 'The user typed this as a written diary entry (not speech-to-text). It may be shorter and more polished than a transcript; still apply the same bar for emotional weight (vulnerability, conflict, loss, turning points, relief).'
+      : 'This is a voice-diary transcription (speech to text).';
+
+    const system = `You are a narrative classifier for SoulTale. ${modality}
+Decide if the entry deserves a collectible card. Cards are only for emotionally significant moments.
 Return valid JSON only.
 If shouldGenerateCard is false, return {"shouldGenerateCard":false}.
-If true, include: shouldGenerateCard, moment, agency, dimension, insight, fragment.
+If true, include ONLY these keys: shouldGenerateCard, moment, agency, dimension, insight, fragment.
+Do NOT add title, cardName, cardTitle, or any other keys — the product uses fixed deck names from the database.
+
 moment must be one of: Beginning,Tension,Confrontation,Turn,Loss,Resolution,Surrender,Revelation.
 agency must be one of: Acted,Received,Observed.
 dimension must be one of: Inner,Interpersonal,Transcendent.
-insight must be a short statement (no question mark).
-fragment must be a literal quote from the text starting with "...".`;
 
+Language: detect the dominant natural language of the entry (e.g. Brazilian Portuguese). Write "insight" in that SAME language. Do not translate the user's language to English.
+insight must be a short reflective statement (no question mark), same language as the entry.
+
+fragment must be a contiguous literal substring copied from the input (same spelling, accents, and language as in the source). Do not translate or paraphrase the fragment.`;
+
+    const label = written ? 'Written entry' : 'Transcription';
     const message = await this.client.messages.create({
       model: this.model,
       max_tokens: 400,
       system,
-      messages: [{ role: 'user', content: `Transcription: """${transcription}"""` }],
+      messages: [{ role: 'user', content: `${label}: """${transcription}"""` }],
     });
 
     const textBlock = message.content.find((c) => c.type === 'text');
@@ -89,9 +100,28 @@ fragment must be a literal quote from the text starting with "...".`;
 
     try {
       const parsed = JSON.parse(this.extractJson(textBlock.text)) as unknown;
-      return this.validate(parsed);
+      const result = this.validate(parsed);
+      this.logger.log(JSON.stringify({
+        event: 'ai.entry_analysis',
+        model: this.model,
+        written,
+        transcriptionChars: transcription.trim().length,
+        shouldGenerateCard: result.shouldGenerateCard,
+        ...(result.shouldGenerateCard
+          ? { moment: result.moment, agency: result.agency, dimension: result.dimension }
+          : {}),
+      }));
+      return result;
     } catch (error) {
-      this.logger.warn(`AI response parse failed: ${String(error)}`);
+      this.logger.warn(JSON.stringify({
+        event: 'ai.entry_analysis',
+        model: this.model,
+        written,
+        transcriptionChars: transcription.trim().length,
+        shouldGenerateCard: false,
+        error: String(error),
+        rawResponse: textBlock.text.slice(0, 300),
+      }));
       return { shouldGenerateCard: false };
     }
   }
