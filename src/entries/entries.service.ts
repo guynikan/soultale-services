@@ -34,11 +34,22 @@ export class EntriesService {
     return { streakDays: 1, streakBonus: 0 };
   }
 
-  async createEntry(input: { userId: string; transcription: string; durationSecs?: number }): Promise<{ entry: Entry; userCard: unknown | null; xpUpdate: XpUpdate }> {
+  async createEntry(input: {
+    userId: string;
+    transcription: string;
+    durationSecs?: number;
+    entryKind?: 'voice' | 'text';
+  }): Promise<{ entry: Entry; userCard: unknown | null; xpUpdate: XpUpdate }> {
     const user = await this.prisma.user.findUnique({ where: { id: input.userId } });
     if (!user) throw new NotFoundException('User not found');
 
-    const decision = await this.unlockPolicy.evaluate({ userId: input.userId, entryId: randomUUID(), transcription: input.transcription, durationSecs: input.durationSecs });
+    const decision = await this.unlockPolicy.evaluate({
+      userId: input.userId,
+      entryId: randomUUID(),
+      transcription: input.transcription,
+      durationSecs: input.durationSecs,
+      entryKind: input.entryKind,
+    });
 
     const durationBonus = (input.durationSecs ?? 0) > 60 ? XP_VALUES.ENTRY_BONUS_LONG : 0;
     const streakMeta = this.computeStreak(user.lastEntryAt);
@@ -55,7 +66,21 @@ export class EntriesService {
 
     let userCard: unknown | null = null;
     if (decision.unlocked) {
-      userCard = await this.userCardsService.create({ userId: input.userId, deckCardId: decision.deckCardId, entryId: entry.id, insight: decision.insight, fragment: decision.fragment, xpEarned: cardXp });
+      const created = await this.userCardsService.create({
+        userId: input.userId,
+        deckCardId: decision.deckCardId,
+        entryId: entry.id,
+        insight: decision.insight,
+        fragment: decision.fragment,
+        xpEarned: cardXp,
+      });
+      // Título da carta vem só do deck canônico (Prisma), nunca de texto gerado pela IA.
+      userCard = {
+        ...created,
+        deckCard: created.deckCard
+          ? { ...created.deckCard, title: decision.deckCardTitle }
+          : created.deckCard,
+      };
     }
 
     const newTotalXp = user.xp + totalEarned;

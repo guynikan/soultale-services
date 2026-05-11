@@ -6,7 +6,10 @@ export const XP_VALUES = {
 } as const;
 
 export const CARD_GATES = {
-  MIN_TRANSCRIPTION_CHARS: 80,
+  /** Entrada com áudio (cliente envia durationSecs) — exige texto longo o bastante + duração mínima. */
+  MIN_TRANSCRIPTION_CHARS_VOICE: 80,
+  /** Entrada só texto (sem durationSecs ou entryKind text) — texto costuma ser mais denso que fala transcrita. */
+  MIN_TRANSCRIPTION_CHARS_TEXT: 55,
   MIN_DURATION_SECS: 20,
   COOLDOWN_HOURS: 12,
   DAILY_CAP: 2,

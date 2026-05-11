@@ -17,7 +17,12 @@ export class EntriesController {
     @Body() dto: CreateEntryDto,
   ) {
     const user = await this.usersService.upsertFromAuth(authUser);
-    return this.entriesService.createEntry({ userId: user.id, transcription: dto.transcription, durationSecs: dto.durationSecs });
+    return this.entriesService.createEntry({
+      userId: user.id,
+      transcription: dto.transcription,
+      durationSecs: dto.durationSecs,
+      entryKind: dto.entryKind,
+    });
   }
 
   @Get()
