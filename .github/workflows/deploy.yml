@@ -24,6 +24,9 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Install prod dependencies (no devDeps, no scripts)
+        run: npm ci --omit=dev --ignore-scripts
+
       - name: Write .env for production
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
@@ -49,16 +52,16 @@ jobs:
           NEW_RELIC_APP_NAME=SoulTale API
           EOF
 
-      - name: Upload dist and .env to VM
+      - name: Upload app to VM
         uses: appleboy/scp-action@917f8b81dfc1ccd331fef9e2d61bdc6c8be94634  # v0.1.7
         with:
           host: ${{ secrets.VM1_HOST }}
           username: ${{ secrets.VM1_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          source: "dist,.env,package.json,package-lock.json,prisma,ecosystem.config.js"
+          source: "dist,.env,node_modules,prisma,ecosystem.config.js"
           target: "~/soultale-services"
 
-      - name: Install prod dependencies, migrate and restart
+      - name: Migrate and restart
         uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2  # v1
         with:
           host: ${{ secrets.VM1_HOST }}
@@ -67,7 +70,6 @@ jobs:
           script: |
             set -e
             cd ~/soultale-services
-            npm ci --omit=dev
             npx prisma migrate deploy
             pm2 startOrReload ecosystem.config.js --env production
             pm2 save

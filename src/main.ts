@@ -16,6 +16,7 @@ async function bootstrap(): Promise<void> {
   );
 
   app.use(helmet());
+  app.setGlobalPrefix('api/v1');
   app.enableCors({ origin: (process.env.ALLOWED_ORIGINS ?? '*').split(',').map((item) => item.trim()) });
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
   app.useGlobalFilters(new HttpExceptionFilter());
