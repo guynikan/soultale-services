@@ -69,5 +69,5 @@ jobs:
             cd ~/soultale-services
             npm ci --omit=dev
             npx prisma migrate deploy
-            pm2 startOrRestart ecosystem.config.js --env production
+            pm2 startOrReload ecosystem.config.js --env production
             pm2 save
