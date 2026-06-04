@@ -1,0 +1,73 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Write .env for production
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ANTHROPIC_MODEL: ${{ secrets.ANTHROPIC_MODEL }}
+          ALLOWED_ORIGINS: ${{ secrets.ALLOWED_ORIGINS }}
+          DECK_ASSETS_PUBLIC_BASE_URL: ${{ secrets.DECK_ASSETS_PUBLIC_BASE_URL }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          NEW_RELIC_LICENSE_KEY: ${{ secrets.NEW_RELIC_LICENSE_KEY }}
+        run: |
+          cat > .env << EOF
+          PORT=3000
+          NODE_ENV=production
+          DATABASE_URL=${DATABASE_URL}
+          FIREBASE_SERVICE_ACCOUNT_JSON=${FIREBASE_SERVICE_ACCOUNT_JSON}
+          ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+          ANTHROPIC_MODEL=${ANTHROPIC_MODEL}
+          ALLOWED_ORIGINS=${ALLOWED_ORIGINS}
+          DECK_ASSETS_PUBLIC_BASE_URL=${DECK_ASSETS_PUBLIC_BASE_URL}
+          CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN}
+          NEW_RELIC_LICENSE_KEY=${NEW_RELIC_LICENSE_KEY}
+          NEW_RELIC_APP_NAME=SoulTale API
+          EOF
+
+      - name: Upload dist and .env to VM
+        uses: appleboy/scp-action@917f8b81dfc1ccd331fef9e2d61bdc6c8be94634  # v0.1.7
+        with:
+          host: ${{ secrets.VM1_HOST }}
+          username: ${{ secrets.VM1_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          source: "dist,.env,package.json,package-lock.json,prisma,ecosystem.config.js"
+          target: "~/soultale-services"
+
+      - name: Install prod dependencies, migrate and restart
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2  # v1
+        with:
+          host: ${{ secrets.VM1_HOST }}
+          username: ${{ secrets.VM1_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            set -e
+            cd ~/soultale-services
+            npm ci --omit=dev
+            npx prisma migrate deploy
+            pm2 startOrRestart ecosystem.config.js --env production
+            pm2 save
