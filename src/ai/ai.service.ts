@@ -79,6 +79,17 @@ If true, include ONLY these keys: shouldGenerateCard, moment, agency, dimension,
 Do NOT add title, cardName, cardTitle, or any other keys — the product uses fixed deck names from the database.
 
 moment must be one of: Beginning,Tension,Confrontation,Turn,Loss,Resolution,Surrender,Revelation.
+Moment definitions (use these to choose the best fit):
+- Beginning: the person initiated or entered something new — a contact, a relationship, an experience, a chapter.
+- Tension: unresolved friction or pressure that hasn't exploded yet; a suspended, uncomfortable state.
+- Confrontation: a direct face-to-face clash, accusation, or challenge between people.
+- Turn: an internal shift — a change in perspective, self-understanding, or direction that comes from within.
+- Loss: something or someone ended, was lost, or slipped away — grief, absence, separation.
+- Resolution: a conflict or open question reached closure — reconciliation, acceptance, a cycle completed.
+- Surrender: yielding to something larger than the self — fate, time, a force beyond control.
+- Revelation: a sudden discovery or insight that changes how the person sees something.
+Key distinction: Beginning is about starting something (especially with others); Turn is about an internal shift. If the person is taking an action toward another person for the first time, choose Beginning.
+
 agency must be one of: Acted,Received,Observed.
 dimension must be one of: Inner,Interpersonal,Transcendent.
 
