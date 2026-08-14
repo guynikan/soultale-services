@@ -99,12 +99,27 @@ insight must be a short reflective statement (no question mark), same language a
 fragment must be a contiguous literal substring copied from the input (same spelling, accents, and language as in the source). Do not translate or paraphrase the fragment.`;
 
     const label = written ? 'Written entry' : 'Transcription';
-    const message = await this.client.messages.create({
-      model: this.model,
-      max_tokens: 400,
-      system,
-      messages: [{ role: 'user', content: `${label}: """${transcription}"""` }],
-    });
+    let message: Anthropic.Message;
+    try {
+      message = await this.client.messages.create({
+        model: this.model,
+        max_tokens: 400,
+        system,
+        messages: [{ role: 'user', content: `${label}: """${transcription}"""` }],
+      });
+    } catch (error) {
+      // Card generation is a bonus on top of the entry — never let an Anthropic
+      // outage (rate limit, timeout, downtime) block saving the diary entry itself.
+      this.logger.warn(JSON.stringify({
+        event: 'ai.entry_analysis',
+        model: this.model,
+        written,
+        transcriptionChars: transcription.trim().length,
+        aiDecision: 'api_error',
+        error: String(error),
+      }));
+      return { shouldGenerateCard: false };
+    }
 
     const textBlock = message.content.find((c) => c.type === 'text');
     if (!textBlock || textBlock.type !== 'text') return { shouldGenerateCard: false };
