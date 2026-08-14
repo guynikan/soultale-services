@@ -2,6 +2,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import fastifyMultipart from '@fastify/multipart';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
@@ -14,6 +15,10 @@ async function bootstrap(): Promise<void> {
     new FastifyAdapter({ loggerInstance: pinoLogger }),
     { logger: new NrLoggerService(pinoLogger) },
   );
+
+  await app.register(fastifyMultipart, {
+    limits: { fileSize: 25 * 1024 * 1024, files: 1 },
+  });
 
   app.use(helmet());
   app.setGlobalPrefix('api/v1');

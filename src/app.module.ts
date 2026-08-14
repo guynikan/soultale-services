@@ -13,6 +13,7 @@ import { EntriesModule } from './entries/entries.module';
 import { QuestsModule } from './quests/quests.module';
 import { AiModule } from './ai/ai.module';
 import { HealthModule } from './health/health.module';
+import { TranscriptionModule } from './transcription/transcription.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { HealthModule } from './health/health.module';
     QuestsModule,
     AiModule,
     HealthModule,
+    TranscriptionModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
